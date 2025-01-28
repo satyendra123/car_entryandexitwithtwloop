@@ -1,0 +1,2 @@
+2024-07-24 17:28:24: Exit boom is open
+2024-07-24 17:28:27: Exit boom status reset to 'N' after 3 seconds
