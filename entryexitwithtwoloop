@@ -1,0 +1,162 @@
+#this is my micropython code which is working fine
+import time
+from machine import Pin
+
+LOOP_A_PIN = 4
+LOOP_B_PIN = 5
+
+detection_timestamp = 0
+timeout = 180  # Timeout in seconds
+
+loop_a_detected = False
+loop_b_detected = False
+sequence_complete = False
+
+# Set up the pins
+loop_a_pin = Pin(LOOP_A_PIN, Pin.IN, Pin.PULL_UP)
+loop_b_pin = Pin(LOOP_B_PIN, Pin.IN, Pin.PULL_UP)
+
+def reset_sequence():
+    global loop_a_detected, loop_b_detected, detection_timestamp
+    loop_a_detected = False
+    loop_b_detected = False
+    detection_timestamp = 0
+
+def send_protocol(is_entry):
+    if is_entry:
+        print(bytearray([0xAA, 0x01, 0x00, 0x55]))  # Entry sequence
+    else:
+        print(bytearray([0xAA, 0x00, 0x01, 0x55]))  # Exit sequence
+
+# Main loop
+while True:
+    if sequence_complete:
+        time.sleep(1)
+        reset_sequence()
+        sequence_complete = False
+        continue
+
+    if loop_a_pin.value() == 0 and not loop_a_detected and not loop_b_detected:
+        loop_a_detected = True
+        detection_timestamp = time.ticks_ms()
+        print("Loop A detected, waiting for Loop B...")
+
+    if loop_b_pin.value() == 0 and not loop_b_detected and not loop_a_detected:
+        loop_b_detected = True
+        detection_timestamp = time.ticks_ms()
+        print("Loop B detected, waiting for Loop A...")
+
+    if loop_a_detected and not loop_b_detected:
+        if loop_b_pin.value() == 0:
+            print("Sequence: Loop A -> Loop B (Car Entry)")
+            send_protocol(True)
+            reset_sequence()
+            sequence_complete = True
+        elif time.ticks_ms() - detection_timestamp > timeout * 1000:
+            print("Timeout: Restarting sequence...")
+            reset_sequence()
+            sequence_complete = True
+
+    if loop_b_detected and not loop_a_detected:
+        if loop_a_pin.value() == 0:
+            print("Sequence: Loop B -> Loop A (Car Exit)")
+            send_protocol(False)
+            reset_sequence()
+            sequence_complete = True
+        elif time.ticks_ms() - detection_timestamp > timeout * 1000:
+            print("Timeout: Restarting sequence...")
+            reset_sequence()
+            sequence_complete = True
+
+    time.sleep(0.01)  # Small delay to avoid busy loop
+
+
+#EXAMPLE-2
+#define LOOP_A_PIN 4
+#define LOOP_B_PIN 5
+
+unsigned long detectionTimestamp = 0;
+unsigned long timeout = 180000;
+
+bool loopADetected = false;
+bool loopBDetected = false;
+bool sequenceComplete = false;
+
+void setup() {
+  pinMode(LOOP_A_PIN, INPUT_PULLUP);
+  pinMode(LOOP_B_PIN, INPUT_PULLUP);
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (sequenceComplete) {
+    delay(1000);
+    resetSequence();
+    sequenceComplete = false;
+    return;
+  }
+
+  if (digitalRead(LOOP_A_PIN) == LOW && !loopADetected && !loopBDetected) {
+    loopADetected = true;
+    detectionTimestamp = millis();
+    Serial.println("Loop A detected, waiting for Loop B...");
+  }
+
+  if (digitalRead(LOOP_B_PIN) == LOW && !loopBDetected && !loopADetected) {
+    loopBDetected = true;
+    detectionTimestamp = millis();
+    Serial.println("Loop B detected, waiting for Loop A...");
+  }
+
+  if (loopADetected && !loopBDetected) {
+    if (digitalRead(LOOP_B_PIN) == LOW) {
+      Serial.println("Sequence: Loop A -> Loop B (Car Entry)");
+      sendProtocol(true);
+      resetSequence();
+      sequenceComplete = true;
+    } 
+    
+    else if (millis() - detectionTimestamp > timeout) {
+      Serial.println("Timeout: Restarting sequence...");
+      resetSequence();
+      sequenceComplete = true;
+    }
+  }
+
+  // If Loop B -> Loop A detected (Car Exit)
+  if (loopBDetected && !loopADetected) {
+    if (digitalRead(LOOP_A_PIN) == LOW) {
+      Serial.println("Sequence: Loop B -> Loop A (Car Exit)");
+      sendProtocol(false);
+      resetSequence();
+      sequenceComplete = true;
+    } else if (millis() - detectionTimestamp > timeout) {
+      Serial.println("Timeout: Restarting sequence...");
+      resetSequence();
+      sequenceComplete = true;
+    }
+  }
+}
+
+void sendProtocol(bool isEntry) {
+  if (isEntry) {
+    Serial.write(0xAA);
+    Serial.write(0x01);
+    Serial.write(0x00);
+    Serial.write(0x55);
+  } else {
+    // Send AA 00 01 55 for car exit
+    Serial.write(0xAA);
+    Serial.write(0x00);
+    Serial.write(0x01);
+    Serial.write(0x55);
+  }
+}
+
+// Function to reset the sequence variables
+void resetSequence() {
+  loopADetected = false;
+  loopBDetected = false;
+  detectionTimestamp = 0;
+}
