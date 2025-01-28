@@ -160,3 +160,90 @@ void resetSequence() {
   loopBDetected = false;
   detectionTimestamp = 0;
 }
+
+#EXAMPLE-3
+#define LOOP_A_PIN 4 // P4 pin for Loop A
+#define LOOP_B_PIN 5 // P5 pin for Loop B
+
+unsigned long detectionTimestamp = 0; // Timestamp for the first loop detection
+unsigned long timeout = 180000; // 3 minutes timeout in milliseconds
+
+bool loopADetected = false; // State for Loop A detection
+bool loopBDetected = false; // State for Loop B detection
+
+void setup() {
+  pinMode(LOOP_A_PIN, INPUT_PULLUP); // Set Loop A pin as input with pull-up resistor
+  pinMode(LOOP_B_PIN, INPUT_PULLUP); // Set Loop B pin as input with pull-up resistor
+
+  Serial.begin(115200); // Initialize serial communication for debugging
+  Serial2.begin(9600);  // Initialize UART2 for communication with external device
+}
+
+void loop() {
+  // Check if Loop A is triggered first
+  if (digitalRead(LOOP_A_PIN) == LOW && !loopADetected && !loopBDetected) {
+    loopADetected = true; // Mark Loop A as detected
+    detectionTimestamp = millis(); // Record the time of detection
+    Serial.println("Loop A detected, waiting for Loop B...");
+  }
+
+  // Check if Loop B is triggered first
+  if (digitalRead(LOOP_B_PIN) == LOW && !loopBDetected && !loopADetected) {
+    loopBDetected = true; // Mark Loop B as detected
+    detectionTimestamp = millis(); // Record the time of detection
+    Serial.println("Loop B detected, waiting for Loop A...");
+  }
+
+  // If Loop A was detected first, wait for Loop B within 3 minutes
+  if (loopADetected) {
+    if (digitalRead(LOOP_B_PIN) == LOW) {
+      // Sequence Loop A -> Loop B detected (Car Entry)
+      Serial.println("Sequence: Loop A -> Loop B (Car Entry)");
+      sendEntryExit(0x01, 0x00); // Send entry protocol
+      resetSequence();    // Reset for the next sequence
+    } else if (millis() - detectionTimestamp > timeout) {
+      // Timeout: Loop B not detected within 3 minutes
+      Serial.println("Timeout: Restarting sequence...");
+      resetSequence(); // Reset sequence
+    }
+  }
+
+  // If Loop B was detected first, wait for Loop A within 3 minutes
+  if (loopBDetected) {
+    if (digitalRead(LOOP_A_PIN) == LOW) {
+      // Sequence Loop B -> Loop A detected (Car Exit)
+      Serial.println("Sequence: Loop B -> Loop A (Car Exit)");
+      sendEntryExit(0x00, 0x01); // Send exit protocol
+      resetSequence();     // Reset for the next sequence
+    } else if (millis() - detectionTimestamp > timeout) {
+      // Timeout: Loop A not detected within 3 minutes
+      Serial.println("Timeout: Restarting sequence...");
+      resetSequence(); // Reset sequence
+    }
+  }
+}
+
+// Function to send the protocol based on car entry or exit
+void sendEntryExit(uint8_t entry_byte, uint8_t exit_byte) {
+  // Create the protocol message as a byte array
+  uint8_t message[] = {0xAA, entry_byte, exit_byte, 0x55};
+
+  // Send the message over UART (Serial2 in your case)
+  Serial2.write(message, sizeof(message));
+
+  // Print the sent message to the Serial Monitor for debugging
+  Serial.print("Sent Message: ");
+  for (int i = 0; i < sizeof(message); i++) {
+    // Print each byte in hexadecimal format
+    Serial.print(message[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();  // Print a newline after the message for readability
+}
+
+// Function to reset the sequence variables
+void resetSequence() {
+  loopADetected = false;
+  loopBDetected = false;
+  detectionTimestamp = 0;
+}
