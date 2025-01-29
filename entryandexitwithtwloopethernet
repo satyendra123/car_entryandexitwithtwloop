@@ -7,7 +7,7 @@ LOOP B (NO) - pin 4
 ethernet connection-
 
 
-relay
+relay - pin 9
 
 */
 
