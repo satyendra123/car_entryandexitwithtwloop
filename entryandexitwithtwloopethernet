@@ -79,7 +79,7 @@ void sendEntryExitData(bool isEntry) {
 
   if (client.connected()) {
     client.print(gateID);
-    client.print(isEntry ? " ENTRY" : " EXIT");
+    client.print(isEntry ? " entry" : " exit");
   } else {
     Serial.println("Failed to send data: Client not connected.");
   }
