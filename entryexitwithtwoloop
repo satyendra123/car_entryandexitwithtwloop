@@ -75,9 +75,6 @@ while True:
 #define LOOP_A_PIN 4
 #define LOOP_B_PIN 5
 
-#define uart_tx_pin 16
-#define uart_rx_pin 17
-
 unsigned long detectionTimestamp = 0;
 unsigned long timeout = 180000;
 
@@ -90,12 +87,8 @@ HardwareSerial mySerial(1);
 void setup() {
   pinMode(LOOP_A_PIN, INPUT_PULLUP);
   pinMode(LOOP_B_PIN, INPUT_PULLUP);
-
-  // Initialize Serial Monitor for debugging
   Serial.begin(9600);
-
-  // Initialize UART for RS485 communication
-  mySerial.begin(9600, SERIAL_8N1, uart_rx_pin, uart_tx_pin);  // RS485 on UART1 with RX and TX pins
+  Serial2.begin(9600, SERIAL_8N1, 17, 16);
 }
 
 void loop() {
@@ -121,7 +114,7 @@ void loop() {
   if (loopADetected && !loopBDetected) {
     if (digitalRead(LOOP_B_PIN) == LOW) {
       Serial.println("Sequence: Loop A -> Loop B (Car Entry)");
-      sendProtocol(true);  // Send entry protocol
+      sendProtocol(true);
       resetSequence();
       sequenceComplete = true;
     } 
@@ -136,7 +129,7 @@ void loop() {
   if (loopBDetected && !loopADetected) {
     if (digitalRead(LOOP_A_PIN) == LOW) {
       Serial.println("Sequence: Loop B -> Loop A (Car Exit)");
-      sendProtocol(false);  // Send exit protocol
+      sendProtocol(false);
       resetSequence();
       sequenceComplete = true;
     } else if (millis() - detectionTimestamp > timeout) {
@@ -165,7 +158,7 @@ void sendProtocol(bool isEntry) {
   for (int i = 0; i < 4; i++) {
     Serial.print("0x");
     if (messageToSend[i] < 0x10) {
-      Serial.print("0");  // Print leading zero if necessary
+      Serial.print("0");
     }
     Serial.print(messageToSend[i], HEX);
     Serial.print(" ");
@@ -173,7 +166,7 @@ void sendProtocol(bool isEntry) {
   Serial.println();
 
   // Send the selected message over RS485
-  mySerial.write(messageToSend, sizeof(entryMessage));
+  Serial2.write(messageToSend, sizeof(entryMessage));
 }
 
 // Function to reset the sequence variables
