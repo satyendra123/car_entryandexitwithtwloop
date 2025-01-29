@@ -1,0 +1,101 @@
+import socket
+import datetime
+import time
+import mysql.connector
+import threading
+
+SERVER_IP = "192.168.1.157"
+SERVER_PORT = 7000
+
+# Database Configuration
+DB_CONFIG = {"host": "localhost","user": "root","password": "","database": "vcd"}
+
+LOG_FILE = "Entry_Boom_services.txt"
+INITIAL_MESSAGE = "|OPENEN%"
+
+def log_message(message):
+    """Logs messages to a file with timestamps."""
+    with open(LOG_FILE, 'a') as log:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log.write(f"{timestamp}: {message}\n")
+
+def send_message(client_socket, message):
+    """Sends a message through the socket."""
+    try:
+        client_socket.sendall(message.encode())
+        log_message(f"Sent message: {message}")
+    except Exception as e:
+        log_message(f"Failed to send message: {e}")
+
+def check_exit_boom(client_socket):
+    """Checks database for exit boom status and sends a message if needed."""
+    last_status = None
+    while True:
+        try:
+            conn = mysql.connector.connect(**DB_CONFIG)
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT entry_gate FROM boomsig")
+            result = cursor.fetchone()
+
+            if result:
+                exit_boom_status = result[0]
+                if exit_boom_status == 'Y' and last_status != 'Y':
+                    log_message("Exit boom is open")
+                    send_message(client_socket, INITIAL_MESSAGE)
+
+                    # Reset exitboom status after delay
+                    time.sleep(3)
+                    cursor.execute("UPDATE boomsig SET entry_gate = 'N'")
+                    conn.commit()
+                    log_message("Entry boom status reset to 'N'")
+
+                last_status = exit_boom_status
+
+            cursor.close()
+            conn.close()
+        except mysql.connector.Error as err:
+            log_message(f"Database error: {err}")
+        except Exception as e:
+            log_message(f"Unexpected error: {e}")
+        time.sleep(3)  # Check every 3 seconds
+
+def main():
+    """Main function to establish socket connection and start monitoring."""
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    try:
+        client_socket.connect((SERVER_IP, SERVER_PORT))
+        log_message(f"Connected to {SERVER_IP}:{SERVER_PORT}")
+
+        # Start database monitoring in a separate thread
+        thread = threading.Thread(target=check_exit_boom, args=(client_socket,), daemon=True)
+        thread.start()
+
+        while True:
+            try:
+                data = client_socket.recv(1024)
+                print(data)
+                if not data:
+                    log_message("Connection lost. Reconnecting...")
+                    break
+                
+                decoded_data = data.decode('utf-8').strip()
+                
+                if "|HLT%" in decoded_data:
+                    log_message(f"Received health packet: {decoded_data}")
+
+                time.sleep(1)
+
+            except socket.error as e:
+                log_message(f"Socket error: {e}")
+                break
+
+    except Exception as e:
+        log_message(f"Connection error: {e}")
+
+    finally:
+        client_socket.close()
+
+if __name__ == "__main__":
+    main()
