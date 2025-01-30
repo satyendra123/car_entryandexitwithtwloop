@@ -9,9 +9,6 @@ class CarLog(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-from django.db import models
-from django.utils import timezone
-
 class Boomsig(models.Model):
     id = models.AutoField(primary_key=True)
     entryboom = models.CharField(max_length=1, default='N')
