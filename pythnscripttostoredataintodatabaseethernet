@@ -36,22 +36,20 @@ def check_exit_boom(client_socket):
             conn = mysql.connector.connect(**DB_CONFIG)
             cursor = conn.cursor()
 
-            cursor.execute("SELECT entry_gate FROM boomsig")
-            result = cursor.fetchone()
+            cursor.execute("SELECT entryboom FROM boomsig")
+            result = cursor.fetchone()  # Fetch one row
+            
+            # Make sure to consume all results
+            cursor.fetchall()  # This ensures that any remaining results are consumed
 
             if result:
                 exit_boom_status = result[0]
-                if exit_boom_status == 'Y' and last_status != 'Y':
+                if exit_boom_status == 'Y':
                     log_message("Exit boom is open")
                     send_message(client_socket, INITIAL_MESSAGE)
-
-                    # Reset exitboom status after delay
-                    time.sleep(3)
-                    cursor.execute("UPDATE boomsig SET entry_gate = 'N'")
+                    cursor.execute("UPDATE boomsig SET entryboom = 'N' WHERE id = 1")
                     conn.commit()
-                    log_message("Entry boom status reset to 'N'")
-
-                last_status = exit_boom_status
+                    log_message("Successfully updated entryboom to 'N'")
 
             cursor.close()
             conn.close()
@@ -60,6 +58,7 @@ def check_exit_boom(client_socket):
         except Exception as e:
             log_message(f"Unexpected error: {e}")
         time.sleep(3)  # Check every 3 seconds
+
 
 def insert_gate_action(gate, action):
     """Inserts the received gate number and action into the database."""
@@ -85,26 +84,31 @@ def main():
         # Start database monitoring in a separate thread
         thread = threading.Thread(target=check_exit_boom, args=(client_socket,), daemon=True)
         thread.start()
-
+        
+        buffer = ""
         while True:
             try:
                 data = client_socket.recv(1024)
-                print(data)
                 if not data:
-                    log_message("Connection lost. Reconnecting...")
+                    print("Connection lost. Reconnecting...")
                     break
-                
-                decoded_data = data.decode('utf-8').strip()
-                
-                if "|HLT%" in decoded_data:
-                    log_message(f"Received health packet: {decoded_data}")
-                
-                # Extract gate number and action (e.g., "1 ENTRY")
-                match = re.search(r'(\d+)\s+(\w+)', decoded_data)
-                if match:
-                    gate_number, action = match.groups()
-                    insert_gate_action(gate_number, action)
-            
+
+                buffer += data.decode('utf-8')
+
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+
+                    print(f"Received: {line}")
+
+                    if "|HLT%" in line:
+                        print(f"Received health packet: {line}")
+
+                    match = re.search(r'(\d+)\s+(\w+)', line)
+                    if match:
+                        gate_number, action = match.groups()
+                        insert_gate_action(gate_number, action)
+
                 time.sleep(1)
 
             except socket.error as e:
