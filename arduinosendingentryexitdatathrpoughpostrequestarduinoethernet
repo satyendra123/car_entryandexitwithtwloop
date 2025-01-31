@@ -242,6 +242,7 @@ void loop() {
 }
 
 #Example-3 this is the code where i am using all my arduino code will send the data. just modified the mac address and ip address so that it pings
+# iska use hum karene services banane ke liye exe se. sabse pahle hum .py code ko .exe me convert kar denge. aur nssm ka path daal denge C:\Windows\System32> D:  cd \vcd_counter_fronted nssm.exe install housys_product "%cd%\finalflaskcodeforexe.exe" 
 #include <SPI.h>
 #include <Ethernet.h>
 
