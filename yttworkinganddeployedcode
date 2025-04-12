@@ -284,7 +284,7 @@ void sendEntryExitData(bool isEntry) {
   Serial.print("Sending JSON: ");
   Serial.println(jsonPayload);
 
-  if (client.connect("192.168.0.128", 8000)) {
+  if (client.connect("192.168.0.128", 5000)) {
     client.print("POST /vehicle_data HTTP/1.1\r\n");
     client.print("Host: 192.168.0.128\r\n");
     client.print("Content-Type: application/json\r\n");
@@ -379,7 +379,7 @@ void checkBoomSig() {
   if (millis() - lastBoomSigCheck >= boomSigCheckInterval) {
     lastBoomSigCheck = millis();
 
-    if (client.connect("192.168.0.128", 8000)) {
+    if (client.connect("192.168.0.128", 5000)) {
       String request = "GET /check_boomsig?gate_id=" + String(gate_id) + " HTTP/1.1\r\n";
       request += "Host: 192.168.0.128\r\n";
       request += "\r\n";
